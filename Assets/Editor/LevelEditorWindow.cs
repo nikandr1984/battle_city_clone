@@ -3,17 +3,18 @@ using UnityEditor;
 using Unity.Hierarchy.Editor;
 
 public class LevelEditorWindow : EditorWindow
-{
-    private const int FieldWidth = 26;
-    private const int FieldHeight = 26;
+{    
+    private const int FieldWidth = LevelData.FieldWidth;   // Ширина игрового поля
+    private const int FieldHeight = LevelData.FildHeight;  // Высота игрового поля
 
-    private const float ToolbarHeight = 24f;
-    private const float StatusHeight = 20f;
-    private const float MinCellSize = 8f;
-    private const float MaxCellSize = 32f;
+    private const float ToolbarHeight = 24f;  // Высота тулбара в пикселях
+    private const float StatusHeight = 20f;   // Высота статус бара в пикселях
+    private const float MinCellSize = 8f;     // Мин.размер клетки в пикселях
+    private const float MaxCellSize = 32f;    // Макс.размер клетки в пикселях
 
-    private float _cellSize = 16f;
-    private bool _showGrid = true;
+    [SerializeField] private LevelData _level;
+    [SerializeField] private float _cellSize = 16f;
+    [SerializeField] private bool _showGrid = true;
 
     private Rect _canvasRect;   // Область холста
     private Rect _fieldRect;    // Область поля рисования
@@ -81,20 +82,42 @@ public class LevelEditorWindow : EditorWindow
         
         // 2. Делаем зону горизонтальной
         GUILayout.BeginHorizontal();
+
+        // 3. Создаем поле для перетаскивания ассета
+        LevelData picked = EditorGUILayout.ObjectField(
+                               _level,                 // Текущее значение
+                               typeof(LevelData),      // Допустимый тип
+                               false,                  // Разрешить ли объекты сцены
+                               GUILayout.Width(160))   // Размер поля
+                               as LevelData;           // Каст чтобы возвращал только этот тип
+       
+        if (picked != _level)
+        {
+            _level = picked;
+            Repaint();
+        }
+
         
-        // 3. Делаем метку Zoom
+        // 4. Делаем метку Zoom
         GUILayout.Label("Zoom", GUILayout.Width(40));
 
-        // 4. Делаем слайдер зума
+        // 5. Делаем слайдер зума
         _cellSize = GUILayout.HorizontalSlider(_cellSize, MinCellSize, MaxCellSize,
                                                                             GUILayout.Width(160));
             
-        // 5. Делаем метку с текущим значением зума
+        // 6. Делаем метку с текущим значением зума
         GUILayout.Label($"{_cellSize:0}px", GUILayout.Width(40));
 
-        // 6. Делаем переключатель сетки
+        // 7. Делаем переключатель сетки
         _showGrid = GUILayout.Toggle(_showGrid, "Grid", EditorStyles.toolbarButton, 
                                                                              GUILayout.Width(60));
+       
+        // 8. 
+        if (GUILayout.Button("Fill test", EditorStyles.toolbarButton, GUILayout.Width(70)))
+        {
+            FillTestPattern();
+        }
+        
         // 7. Закрываем горизонтальную зону
         GUILayout.EndHorizontal();
 
@@ -111,18 +134,24 @@ public class LevelEditorWindow : EditorWindow
                                                               position.width, StatusHeight));
 
         // 2. Определяем координаты ячейки и сохраняем в переменную
-        string statLable = "";        
+        
+        string statText;        
+
         if (IsInBounds(_cursorCell))
         {
-            statLable = $"Cell: ({_cursorCell.x}, {_cursorCell.y})";
+            string tileType = _level != null
+                ? _level.GetTile(_cursorCell.x, _cursorCell.y).ToString()
+                : "-";
+                        
+            statText = $"Cell: ({_cursorCell.x}, {_cursorCell.y}) Tile: {tileType}";
         }
         else
         {
-            statLable = "Cell: -";
+            statText = "Cell: -";
         }
 
         // 3. Создаем метку с координатами ячейки
-        GUILayout.Label(statLable);
+        GUILayout.Label(statText);
 
         // 4. Закрываем зону статусбара
         GUILayout.EndArea();            
@@ -138,18 +167,9 @@ public class LevelEditorWindow : EditorWindow
 
         // 2. Отрисовка клеток шахматкой
         for (int y = 0; y < FieldHeight; y++)
+        for (int x = 0; x < FieldWidth; x++)
         {
-            for (int x = 0; x < FieldWidth; x++)
-            {
-                if ((x + y) % 2 == 0)
-                {
-                    EditorGUI.DrawRect(CellRect(x,y), CellColorA);
-                }
-                else
-                {
-                    EditorGUI.DrawRect(CellRect(x, y), CellColorB);
-                }        
-            }
+            EditorGUI.DrawRect(CellRect(x, y), CellColor(x, y));           
         }
 
         // 3. Отрисовка сетки (линий)
@@ -185,9 +205,44 @@ public class LevelEditorWindow : EditorWindow
                 EditorGUI.DrawRect(CellRect(_cursorCell.x, _cursorCell.y), HoverColor);
             }
             
-
+            // 6. Напоминание назначить LevelData
+            if(_level == null)
+            {
+                GUI.Label(new Rect(_canvasRect.x, _canvasRect.y + 2, _canvasRect.width, 18),
+                    "Назначь LevelData в тулбаре", EditorStyles.centeredGreyMiniLabel);
+            }
         }
     }
+
+
+    // МЕТОД: какого цвета должна быть клетка с координатами (х,у)
+    private Color CellColor(int x, int y)
+    {
+        // 1. Если есть загруженный уровень и таил не пустой - рисуем цветом
+        if (_level != null)
+        {
+            TileType t = _level.GetTile(x, y);
+
+            if (t != TileType.Empty)
+            {
+                return ColorForTile(t);
+            }               
+        }
+
+        // 2. Если уровень не загружен или таил пустой - рисуем шахматкой
+        return (x + y) % 2 == 0 ? CellColorA : CellColorB;
+    }
+
+    private static Color ColorForTile(TileType t) => t switch
+    {
+        TileType.Brick  => new Color(0.72f, 0.27f, 0.16f),
+        TileType.Steel  => new Color(0.75f, 0.75f, 0.78f),
+        TileType.Water  => new Color(0.15f, 0.35f, 0.90f),
+        TileType.Forest => new Color(0.16f, 0.50f, 0.20f),
+        TileType.Ice    => new Color(0.60f, 0.85f, 0.95f),
+        _               => CellColorA,
+    };
+
 
 
     // --- МЕТОД ОБРАБОТКИ ВВОДА ---
@@ -214,6 +269,35 @@ public class LevelEditorWindow : EditorWindow
         }
     }
     
+
+    // --- ЗАГЛУШКА ---
+
+    private void FillTestPattern()
+    {
+        if (_level == null) return;
+
+        Undo.RegisterCompleteObjectUndo(_level, "Test fill");
+
+        for (int y = 0; y < FieldHeight; y++)
+        for (int x = 0; x < FieldWidth; x++)
+        {
+            TileType t = TileType.Empty;
+            if      (x >= 4  && x <= 7  && y >= 4  && y <= 7)  t = TileType.Brick;
+            else if (x >= 10 && x <= 13 && y >= 4  && y <= 7)  t = TileType.Steel;
+            else if (x >= 16 && x <= 19 && y >= 4  && y <= 7)  t = TileType.Water;
+            else if (x >= 4  && x <= 7  && y >= 10 && y <= 13) t = TileType.Forest;
+            else if (x >= 10 && x <= 13 && y >= 10 && y <= 13) t = TileType.Ice;
+            _level.SetTile(x, y, t);
+        }
+
+        EditorUtility.SetDirty(_level);
+
+        Repaint();
+    }
+
+
+
+
 
 
     // --- ХЕЛПЕРЫ ---
