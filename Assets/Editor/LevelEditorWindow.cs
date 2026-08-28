@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEditor;
 using Unity.Hierarchy.Editor;
+using UnityEngine.Rendering.VirtualTexturing;
 
 public class LevelEditorWindow : EditorWindow
 {    
@@ -9,16 +10,33 @@ public class LevelEditorWindow : EditorWindow
 
     private const float ToolbarHeight = 24f;  // Высота тулбара в пикселях
     private const float StatusHeight = 20f;   // Высота статус бара в пикселях
+    private const float PaletteWidth = 110f;  // Ширина панели кистей
     private const float MinCellSize = 8f;     // Мин.размер клетки в пикселях
     private const float MaxCellSize = 32f;    // Макс.размер клетки в пикселях
+    
 
-    [SerializeField] private LevelData _level;
-    [SerializeField] private float _cellSize = 16f;
-    [SerializeField] private bool _showGrid = true;
+    [SerializeField] private LevelData _level;                 // Ссылка на ассет с данными уровня
+    [SerializeField] private float _cellSize = 16f;            // Размер клетки в пикселях
+    [SerializeField] private bool _showGrid = true;            // Статус отрисовки сетки
+    [SerializeField] private TileType _brush = TileType.Brick; // Текущая кисть
 
-    private Rect _canvasRect;   // Область холста
-    private Rect _fieldRect;    // Область поля рисования
+
+    private Rect _canvasRect;                        // Область холста
+    private Rect _fieldRect;                         // Область поля рисования
     private Vector2Int _cursorCell = new(-1, -1);
+
+    private static readonly TileType[] AllTiles =
+        (TileType[])System.Enum.GetValues(typeof(TileType)); // Кэш всех типов тайлов
+
+
+    private bool _isPainting;            // Мышь зажата и штрих идет
+    private bool _strokeUndoRegistered;  // undo-снимок сделан (лениво)
+    private TileType _strokeBrush;       // Кисть штриха: ЛКМ = _brush, ПКМ = Empty
+    private Vector2Int _lastPaintedCell; // Для интерполяции линии
+
+    private static GUIStyle _s_brushBtn;    // Стиль обычных кнопок кистей
+    private static GUIStyle _s_brushBtnSel; // Стиль выделенной кнопки кисти
+
 
     private static readonly Color BgColor = new(0.16f, 0.16f, 0.16f);          // Цвет окна
     private static readonly Color CellColorA = new(0.22f, 0.22f, 0.24f);       // Цвет ячейки А
@@ -34,7 +52,7 @@ public class LevelEditorWindow : EditorWindow
     private static void ShowWindow()
     {
         var window = GetWindow<LevelEditorWindow>("BC Level Editor");
-        window.minSize = new Vector2(560, 560);
+        window.minSize = new Vector2(680, 560);
         window.Show();
     }
 
@@ -49,17 +67,19 @@ public class LevelEditorWindow : EditorWindow
     {
         ComputeLayout();
         DrawToolbar();
+        DrawPalette();
         DrawCanvas();
         HandleInput();
         DrawStatusBar();
     }
 
 
-    // --- РАСЧЕТЫ РАЗМЕРОВ И ЦЕНТРИРОВАНИЕ ПОЛЯ РИСОВАНИЯ ОТНОСИТЕЛЬНО ХОЛСТА ---
+    // --- КОМПОНОВКА ЭЛЕМЕНТОВ ---
     private void ComputeLayout()
     {
         // 1. Прямоугольник описывающий всю центральную область
-        _canvasRect = new Rect(0, ToolbarHeight, position.width,
+        _canvasRect = new Rect(PaletteWidth, ToolbarHeight,
+                               position.width - PaletteWidth,
                                position.height - ToolbarHeight - StatusHeight);
 
         // 2. Вычисление размера поля в пикселях
@@ -74,7 +94,7 @@ public class LevelEditorWindow : EditorWindow
     }
 
 
-    // --- РИСУЕМ ТУЛБАР С АВТОМАТИЧЕСКОЙ КОМПОНОВКОЙ ---
+    // --- ТУЛБАР ---
     private void DrawToolbar()
     {
         // 1. Команда начала зоны тулбара
@@ -110,23 +130,70 @@ public class LevelEditorWindow : EditorWindow
 
         // 7. Делаем переключатель сетки
         _showGrid = GUILayout.Toggle(_showGrid, "Grid", EditorStyles.toolbarButton, 
-                                                                             GUILayout.Width(60));
-       
-        // 8. 
-        if (GUILayout.Button("Fill test", EditorStyles.toolbarButton, GUILayout.Width(70)))
-        {
-            FillTestPattern();
-        }
+                                                                             GUILayout.Width(60));  
         
-        // 7. Закрываем горизонтальную зону
+        // 8. Закрываем горизонтальную зону
         GUILayout.EndHorizontal();
 
-        // 8. Закрываем зону тулбара
+        // 9. Закрываем зону тулбара
         GUILayout.EndArea();
     }
 
 
-    // --- РИСУЕМ СТАТУСБАР ---
+    // --- ПАЛИТРА ---
+    private void DrawPalette()
+    {
+        // 1. Задаем координаты и размер области палитры
+        Rect paletteArea = new Rect(0, ToolbarHeight, 
+                               PaletteWidth, position.height - ToolbarHeight - StatusHeight);
+        
+        // 2. Начинаем зону палитры
+        GUILayout.BeginArea(paletteArea);
+        {
+            // 3. Делаем метку Кисти
+            GUILayout.Label("Кисти", EditorStyles.boldLabel);
+
+            // 4. Создаем безопасные копии стилей кистей
+            EnsureBrushStyles();
+
+            // 5. Отрисовываем кнопки (по количеству тайлов)
+            foreach (TileType t in AllTiles)
+            {
+                GUI.backgroundColor = ColorForTile(t);
+
+                if (GUILayout.Button(t.ToString(), _brush == t ? _s_brushBtnSel : _s_brushBtn,
+                                      GUILayout.Height(20)))
+                {
+                    _brush = t;
+                }
+
+                GUI.backgroundColor = Color.white;
+            }
+        }
+        GUILayout.EndArea();
+    }
+
+
+    // МЕТОД лениво кэширует стили кистей
+    private static void EnsureBrushStyles()
+    {
+        // 1. Предохранитель
+        if (_s_brushBtn != null) return;
+
+        // 2. Создание безопасной копии базового стиля
+        _s_brushBtn = new GUIStyle(EditorStyles.miniButton);
+        _s_brushBtnSel = new GUIStyle(EditorStyles.miniButton);
+
+        // 3. Кастомизация стиля для выбранной кисти
+        _s_brushBtnSel.fontStyle = FontStyle.Bold;
+        _s_brushBtnSel.normal.textColor = new Color(1f, 0.8f, 0.3f);
+    }
+
+
+
+
+
+    // --- СТАТУСБАР ---
     private void DrawStatusBar()
     {
         // 1. Начало зоны статусбара
@@ -159,7 +226,7 @@ public class LevelEditorWindow : EditorWindow
 
 
 
-    // --- РИСУЕМ ХОЛСТ ---
+    // --- ХОЛСТ ---
     private void DrawCanvas()
     {
         // 1. Заливка всей доступной области канваса серым цветом
@@ -245,7 +312,7 @@ public class LevelEditorWindow : EditorWindow
 
 
 
-    // --- МЕТОД ОБРАБОТКИ ВВОДА ---
+    // --- ОБРАБОТКА ВВОДА ---
     private void HandleInput()
     {
         // 1. Получение текущего события
@@ -267,42 +334,36 @@ public class LevelEditorWindow : EditorWindow
             _cursorCell = new(-1, -1);
             Repaint();
         }
+        else if (e.type == EventType.MouseDown && e.button == 0)
+        {
+            TryPaint(CellAt(e.mousePosition));
+        }
     }
     
 
-    // --- ЗАГЛУШКА ---
-
-    private void FillTestPattern()
+    private void TryPaint(Vector2Int cell)
     {
-        if (_level == null) return;
+        // 1. Если данные уровня не заданы или курсор не на клетке - выходим
+        if (_level == null || !IsInBounds(cell)) return;
 
-        Undo.RegisterCompleteObjectUndo(_level, "Test fill");
+        // 2. Не трогаем клетку, если тип не меняется
+        if (_level.GetTile(cell.x, cell.y) == _brush) return;
 
-        for (int y = 0; y < FieldHeight; y++)
-        for (int x = 0; x < FieldWidth; x++)
-        {
-            TileType t = TileType.Empty;
-            if      (x >= 4  && x <= 7  && y >= 4  && y <= 7)  t = TileType.Brick;
-            else if (x >= 10 && x <= 13 && y >= 4  && y <= 7)  t = TileType.Steel;
-            else if (x >= 16 && x <= 19 && y >= 4  && y <= 7)  t = TileType.Water;
-            else if (x >= 4  && x <= 7  && y >= 10 && y <= 13) t = TileType.Forest;
-            else if (x >= 10 && x <= 13 && y >= 10 && y <= 13) t = TileType.Ice;
-            _level.SetTile(x, y, t);
-        }
+        // 3. Меняем тип клетки в массиве LevelData
+        _level.SetTile(cell.x, cell.y, _brush);
 
+        // 4. помечаем ассет как «измененный», чтобы Unity предложила его сохранить
         EditorUtility.SetDirty(_level);
 
-        Repaint();
+        // 5. Отрисовываем изменения
+        Repaint();        
     }
 
-
-
-
-
+    
 
     // --- ХЕЛПЕРЫ ---
 
-    // I. Конвертор координат
+    // I. Конвертор координат тайлов (логические в пиксели)
     private Rect CellRect(int x, int y)
     {
         return new(_fieldRect.x + x * _cellSize, // Левый край (Х)
