@@ -318,46 +318,117 @@ public class LevelEditorWindow : EditorWindow
         // 1. Получение текущего события
         Event e = Event.current;
 
-        // 2. Обработка движения и перетаскивания
-        if (e.type == EventType.MouseMove || e.type== EventType.MouseDrag)
+        // 2. Обработка события
+        switch (e.type)
         {
-            Vector2Int cell = CellAt(e.mousePosition);
-
-            if (cell != _cursorCell)
+            case EventType.MouseMove:
             {
-                _cursorCell = cell;
+                UpdateCursor(CellAt(e.mousePosition));
+                break;
+            }                
+
+            case EventType.MouseDown:
+            {
+                if (_level == null) break;
+                if (e.button != 0 && e.button != 1) break;
+
+                Vector2Int cell = CellAt(e.mousePosition);
+                if (!IsInBounds(cell)) break;
+                                          
+                _isPainting = true;
+                _strokeUndoRegistered = false;
+                _strokeBrush = e.button == 0 ? _brush : TileType.Empty;
+                _lastPaintedCell = cell;
+                PaintCell(cell, _strokeBrush);
+                e.Use();
                 Repaint();
+                break;
+            }
+
+            case EventType.MouseDrag:
+            {
+                UpdateCursor(CellAt(e.mousePosition));  
+                if (!_isPainting) break;
+
+                Vector2Int cell = CellAt(e.mousePosition);
+
+                if (IsInBounds(cell) && cell != _lastPaintedCell)
+                {
+                    PaintLine(_lastPaintedCell, cell, _strokeBrush);
+                    _lastPaintedCell = cell;
+                    e.Use();
+                    Repaint();
+                }
+                break;
+            }
+
+            case EventType.MouseUp:
+            {
+               _isPainting = false;
+               break;
+            }
+
+            case EventType.MouseLeaveWindow:
+            {
+               _isPainting = false;
+               UpdateCursor(new Vector2Int(-1, -1));
+               break;
+
             }
         }
-        else if (e.type == EventType.MouseLeaveWindow)
-        {
-            _cursorCell = new(-1, -1);
-            Repaint();
-        }
-        else if (e.type == EventType.MouseDown && e.button == 0)
-        {
-            TryPaint(CellAt(e.mousePosition));
-        }
     }
-    
 
-    private void TryPaint(Vector2Int cell)
+
+    // МЕТОД ховер курсора
+    private void UpdateCursor(Vector2Int cell)
     {
-        // 1. Если данные уровня не заданы или курсор не на клетке - выходим
-        if (_level == null || !IsInBounds(cell)) return;
+        if (cell == _cursorCell) return;
+        _cursorCell = cell;
+        Repaint();
+    }
+
+    private void PaintCell(Vector2Int cell, TileType brush)
+    {
+        // 1. Если курсор не на клетке - выходим
+        if (!IsInBounds(cell)) return;
 
         // 2. Не трогаем клетку, если тип не меняется
-        if (_level.GetTile(cell.x, cell.y) == _brush) return;
+        if (_level.GetTile(cell.x, cell.y) == brush) return;
 
-        // 3. Меняем тип клетки в массиве LevelData
-        _level.SetTile(cell.x, cell.y, _brush);
+        // 3. Снимок undo только перед первым реальным изменением штриха
+        if (!_strokeUndoRegistered)
+        {
+            Undo.RegisterCompleteObjectUndo(_level, "Paint level");
+            _strokeUndoRegistered = true;
+        }
 
-        // 4. помечаем ассет как «измененный», чтобы Unity предложила его сохранить
+        // 4. Меняем тип клетки в массиве LevelData
+        _level.SetTile(cell.x, cell.y, brush);
+
+        // 5. помечаем ассет как «измененный», чтобы Unity предложила его сохранить
         EditorUtility.SetDirty(_level);
-
-        // 5. Отрисовываем изменения
-        Repaint();        
     }
+
+
+    // МЕТОД: рисование по алгоритму Брезенхэма
+    private void PaintLine(Vector2Int from, Vector2Int to, TileType brush)
+    {
+        int x0 = from.x, y0 = from.y;                         // Начальная точка
+        int x1 = to.x,   y1 = to.y;                           // Конечная точка
+        int dx = Mathf.Abs(x1 - x0), dy = Mathf.Abs(y1 - y0); // Длины проекций отрезков
+        int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;     // Напрвление шага
+        int err = dx - dy;                                    // Начальная ошибка
+
+        while (true)
+        {
+            PaintCell(new Vector2Int(x0, y0), brush);
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 <  dx) { err += dx; y0 += sy; }
+        }
+    }
+       
 
     
 
