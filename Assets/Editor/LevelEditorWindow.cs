@@ -6,38 +6,48 @@ using UnityEngine.Rendering.VirtualTexturing;
 public class LevelEditorWindow : EditorWindow
 {    
     private const int FieldWidth = LevelData.FieldWidth;   // Ширина игрового поля
-    private const int FieldHeight = LevelData.FildHeight;  // Высота игрового поля
+    private const int FieldHeight = LevelData.FieldHeight;  // Высота игрового поля
 
     private const float ToolbarHeight = 24f;  // Высота тулбара в пикселях
     private const float StatusHeight = 20f;   // Высота статус бара в пикселях
     private const float PaletteWidth = 110f;  // Ширина панели кистей
     private const float MinCellSize = 8f;     // Мин.размер клетки в пикселях
     private const float MaxCellSize = 32f;    // Макс.размер клетки в пикселях
+
+    private enum ToolType { Brush, Base, P1, P2, E1, E2, E3 }  // Типы инструментов редактора
     
 
-    [SerializeField] private LevelData _level;                 // Ссылка на ассет с данными уровня
-    [SerializeField] private float _cellSize = 16f;            // Размер клетки в пикселях
-    [SerializeField] private bool _showGrid = true;            // Статус отрисовки сетки
-    [SerializeField] private TileType _brush = TileType.Brick; // Текущая кисть
+    [SerializeField] private LevelData _level;                      // Ссылка на ассет с данными уровня
+    [SerializeField] private float _cellSize = 16f;                 // Размер клетки в пикселях
+    [SerializeField] private bool _showGrid = true;                 // Статус отрисовки сетки
+    [SerializeField] private TileType _brush = TileType.Brick;      // Текущая кисть
+    [SerializeField] private bool _blockMode;                       // Режим штампа 2х2
+    [SerializeField] private ToolType _activeTool = ToolType.Brush; // Активный инструмент
+
+
 
 
     private Rect _canvasRect;                        // Область холста
     private Rect _fieldRect;                         // Область поля рисования
-    private Vector2Int _cursorCell = new(-1, -1);
+    private Vector2Int _cursorCell = new(-1, -1);    // Ячейка под курсором
 
     private static readonly TileType[] AllTiles =
         (TileType[])System.Enum.GetValues(typeof(TileType)); // Кэш всех типов тайлов
 
 
+    // Поля состояния штриха
     private bool _isPainting;            // Мышь зажата и штрих идет
     private bool _strokeUndoRegistered;  // undo-снимок сделан (лениво)
     private TileType _strokeBrush;       // Кисть штриха: ЛКМ = _brush, ПКМ = Empty
     private Vector2Int _lastPaintedCell; // Для интерполяции линии
 
+    // Стили
     private static GUIStyle _s_brushBtn;    // Стиль обычных кнопок кистей
     private static GUIStyle _s_brushBtnSel; // Стиль выделенной кнопки кисти
+    private static GUIStyle _s_markerLabel; // Стиль для текста на маркерах
 
 
+    // Палитра тайлов
     private static readonly Color BgColor = new(0.16f, 0.16f, 0.16f);          // Цвет окна
     private static readonly Color CellColorA = new(0.22f, 0.22f, 0.24f);       // Цвет ячейки А
     private static readonly Color CellColorB = new(0.25f, 0.25f, 0.28f);       // Цвет ячейки В
@@ -45,8 +55,14 @@ public class LevelEditorWindow : EditorWindow
     private static readonly Color BorderColor = new(0.90f, 0.60f, 0.10f);      // Цвет рамки
     private static readonly Color HoverColor = new(1f, 1f, 1f, 0.15f);         // Цвет подсветки
 
+    // Палитра маркеров
+    private static readonly Color MarkerBase = new(0.95f, 0.75f, 0.20f);   // Маркер базы
+    private static readonly Color MarkerPlayer = new(0.30f, 0.80f, 0.35f); // Маркер игроков    
+    private static readonly Color MarkerEnemy = new(0.90f, 0.30f, 0.30f);  // Маркер врагов
+    private static readonly Color MarkerGhost = new(1f, 1f, 1f, 0.25f);    // Прозрачность
 
-    
+
+
     // Создает окно, если его нет
     [MenuItem("Tools/Battle_City_Clone/Level Editor")]
     private static void ShowWindow()
@@ -169,7 +185,13 @@ public class LevelEditorWindow : EditorWindow
 
                 GUI.backgroundColor = Color.white;
             }
+
+            // 6. Переключатель режима штампа
+            GUILayout.Space(6);
+            _blockMode = GUILayout.Toggle(_blockMode, "Block 2x2",
+                                          EditorStyles.miniButton, GUILayout.Height(20));           
         }
+
         GUILayout.EndArea();
     }
 
@@ -226,7 +248,7 @@ public class LevelEditorWindow : EditorWindow
 
 
 
-    // --- ХОЛСТ ---
+    // --- КАНВАС ---
     private void DrawCanvas()
     {
         // 1. Заливка всей доступной области канваса серым цветом
@@ -269,8 +291,15 @@ public class LevelEditorWindow : EditorWindow
             // 5. Подсветка клетки под курсором
             if (IsInBounds(_cursorCell))
             {
-                EditorGUI.DrawRect(CellRect(_cursorCell.x, _cursorCell.y), HoverColor);
+                Vector2Int o = StampOrigin(_cursorCell);
+                int sizeRatio = _blockMode ? 2 : 1;
+                EditorGUI.DrawRect(new Rect(_fieldRect.x + o.x * _cellSize,
+                                            _fieldRect.y + o.y * _cellSize,
+                                            _cellSize * sizeRatio,
+                                            _cellSize * sizeRatio), 
+                                            HoverColor);                                            
             }
+                       
             
             // 6. Напоминание назначить LevelData
             if(_level == null)
@@ -379,7 +408,7 @@ public class LevelEditorWindow : EditorWindow
     }
 
 
-    // МЕТОД ховер курсора
+    // МЕТОД: ховер курсора
     private void UpdateCursor(Vector2Int cell)
     {
         if (cell == _cursorCell) return;
@@ -387,30 +416,38 @@ public class LevelEditorWindow : EditorWindow
         Repaint();
     }
 
+    
+    // МЕТОД: раскрашивает клетки
     private void PaintCell(Vector2Int cell, TileType brush)
     {
-        // 1. Если курсор не на клетке - выходим
-        if (!IsInBounds(cell)) return;
+        Vector2Int origin = StampOrigin(cell);
+        int sizeRatio = _blockMode ? 2 : 1;
 
-        // 2. Не трогаем клетку, если тип не меняется
-        if (_level.GetTile(cell.x, cell.y) == brush) return;
-
-        // 3. Снимок undo только перед первым реальным изменением штриха
-        if (!_strokeUndoRegistered)
+        for (int dy = 0; dy < sizeRatio; dy++)
+        for (int dx = 0; dx < sizeRatio; dx++)
         {
-            Undo.RegisterCompleteObjectUndo(_level, "Paint level");
-            _strokeUndoRegistered = true;
-        }
+            Vector2Int c = new Vector2Int(origin.x + dx, origin.y + dy);
+            
+            if (!IsInBounds(c)) continue;
+            if (_level.GetTile(c.x, c.y) == brush) continue;
 
-        // 4. Меняем тип клетки в массиве LevelData
-        _level.SetTile(cell.x, cell.y, brush);
+            // Снимок undo только перед первым реальным изменением штриха
+            if (!_strokeUndoRegistered)
+            {
+               Undo.RegisterCompleteObjectUndo(_level, "Paint level");
+               _strokeUndoRegistered = true;
+            }
 
-        // 5. помечаем ассет как «измененный», чтобы Unity предложила его сохранить
-        EditorUtility.SetDirty(_level);
+            // Меняем тип клетки в массиве LevelData
+            _level.SetTile(c.x, c.y, brush);
+
+            // помечаем ассет как «измененный», чтобы Unity предложила его сохранить
+            EditorUtility.SetDirty(_level);
+        }          
     }
 
 
-    // МЕТОД: рисование по алгоритму Брезенхэма
+    // МЕТОД: рисует линии по алгоритму Брезенхэма
     private void PaintLine(Vector2Int from, Vector2Int to, TileType brush)
     {
         int x0 = from.x, y0 = from.y;                         // Начальная точка
@@ -428,6 +465,11 @@ public class LevelEditorWindow : EditorWindow
             if (e2 <  dx) { err += dx; y0 += sy; }
         }
     }
+
+
+    // МЕТОД: выравнивает клетки к началу блока 2х2
+    private Vector2Int StampOrigin(Vector2Int cell) =>
+        _blockMode ? new Vector2Int(cell.x & ~1, cell.y & ~1) : cell;
        
 
     
