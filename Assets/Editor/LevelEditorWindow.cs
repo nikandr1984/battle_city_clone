@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using Unity.Hierarchy.Editor;
 using UnityEngine.Rendering.VirtualTexturing;
+using Unity.VisualScripting;
 
 public class LevelEditorWindow : EditorWindow
 {    
@@ -42,25 +43,26 @@ public class LevelEditorWindow : EditorWindow
     private Vector2Int _lastPaintedCell; // Для интерполяции линии
 
     // Стили
-    private static GUIStyle _s_brushBtn;    // Стиль обычных кнопок кистей
-    private static GUIStyle _s_brushBtnSel; // Стиль выделенной кнопки кисти
-    private static GUIStyle _s_markerLabel; // Стиль для текста на маркерах
+    private static GUIStyle _s_brushBtn;          // Стиль обычных кнопок кистей
+    private static GUIStyle _s_brushBtnSel;       // Стиль выделенной кнопки кисти
+    private static GUIStyle _s_markerLabel;       // Стиль для текста на маркерах
+    private static GUIStyle _s_blockToggle;       // Стиль для тогла блока
+   
+
 
 
     // Палитра тайлов
-    private static readonly Color BgColor = new(0.16f, 0.16f, 0.16f);          // Цвет окна
-    private static readonly Color CellColorA = new(0.22f, 0.22f, 0.24f);       // Цвет ячейки А
-    private static readonly Color CellColorB = new(0.25f, 0.25f, 0.28f);       // Цвет ячейки В
-    private static readonly Color GridColor = new(0.40f, 0.40f, 0.49f, 0.35f); // Цвет сетки
-    private static readonly Color BorderColor = new(0.90f, 0.60f, 0.10f);      // Цвет рамки
-    private static readonly Color HoverColor = new(1f, 1f, 1f, 0.15f);         // Цвет подсветки
+    private static readonly Color BgColor =     new(0.16f, 0.16f, 0.16f);        // Цвет окна
+    private static readonly Color CellColorA =  new(0.22f, 0.22f, 0.24f);        // Цвет ячейки А
+    private static readonly Color CellColorB =  new(0.25f, 0.25f, 0.28f);        // Цвет ячейки В
+    private static readonly Color GridColor =   new(0.40f, 0.40f, 0.49f, 0.35f); // Цвет сетки
+    private static readonly Color BorderColor = new(0.90f, 0.60f, 0.10f);        // Цвет рамки    
 
     // Палитра маркеров
-    private static readonly Color MarkerBase = new(0.95f, 0.75f, 0.20f);   // Маркер базы
+    private static readonly Color MarkerBase =   new(0.95f, 0.75f, 0.20f); // Маркер базы
     private static readonly Color MarkerPlayer = new(0.30f, 0.80f, 0.35f); // Маркер игроков    
-    private static readonly Color MarkerEnemy = new(0.90f, 0.30f, 0.30f);  // Маркер врагов
-    private static readonly Color MarkerGhost = new(1f, 1f, 1f, 0.25f);    // Прозрачность
-
+    private static readonly Color MarkerEnemy =  new(0.90f, 0.30f, 0.30f); // Маркер врагов
+   
 
 
     // Создает окно, если его нет
@@ -124,7 +126,7 @@ public class LevelEditorWindow : EditorWindow
                                _level,                 // Текущее значение
                                typeof(LevelData),      // Допустимый тип
                                false,                  // Разрешить ли объекты сцены
-                               GUILayout.Width(160))   // Размер поля
+                               GUILayout.Width(200))   // Размер поля
                                as LevelData;           // Каст чтобы возвращал только этот тип
        
         if (picked != _level)
@@ -172,67 +174,127 @@ public class LevelEditorWindow : EditorWindow
             // 4. Создаем безопасные копии стилей кистей
             EnsureBrushStyles();
 
-            // 5. Отрисовываем кнопки (по количеству тайлов)
+            // 5. Отрисовываем кнопки тайлов
             foreach (TileType t in AllTiles)
             {
+                bool isSelected = _activeTool == ToolType.Brush && _brush == t;
+
                 GUI.backgroundColor = ColorForTile(t);
 
-                if (GUILayout.Button(t.ToString(), _brush == t ? _s_brushBtnSel : _s_brushBtn,
-                                      GUILayout.Height(20)))
-                {
-                    _brush = t;
-                }
+                bool clicked = GUILayout.Button(t.ToString(), isSelected ? _s_brushBtnSel : _s_brushBtn,
+                    GUILayout.Height(20));
 
                 GUI.backgroundColor = Color.white;
+
+                if (clicked)
+                {
+                    _brush = t;
+                    _activeTool = ToolType.Brush;
+                }                
             }
 
+            
+
             // 6. Переключатель режима штампа
-            GUILayout.Space(6);
-            _blockMode = GUILayout.Toggle(_blockMode, "Block 2x2",
-                                          EditorStyles.miniButton, GUILayout.Height(20));           
+            GUILayout.Space(10);
+
+            _blockMode = GUILayout.Toggle(_blockMode, "Block 2x2", _s_blockToggle, GUILayout.Height(20));            
+            
+            
+            // 7. Отрисовываем кнопки маркеров
+            GUILayout.Space(10);
+            GUILayout.Label("Маркеры", EditorStyles.boldLabel);
+
+            DrawToolButton("База (В)", ToolType.Base, MarkerBase);
+            DrawToolButton("Игрок 1",  ToolType.P1, MarkerPlayer);
+            DrawToolButton("Игрок 2",  ToolType.P2, MarkerPlayer);
+            DrawToolButton("Враг 1",   ToolType.E1, MarkerEnemy);
+            DrawToolButton("Враг 2",   ToolType.E2, MarkerEnemy);
+            DrawToolButton("Враг 3",   ToolType.E3, MarkerEnemy);
         }
 
         GUILayout.EndArea();
     }
 
+    // МЕТОД: создание универсальной кнопки инструмента
+    private void DrawToolButton(string label, ToolType tool, Color bgColor)
+    {
+        bool isSelected = _activeTool == tool;
+        GUI.backgroundColor = isSelected ? bgColor : bgColor * 0.5f;
+        if (GUILayout.Button(label, isSelected ? _s_brushBtnSel : _s_brushBtn, GUILayout.Height(20)))
+        {
+            _activeTool = tool;
+        }
+        GUI.backgroundColor = Color.white;
+    }
 
-    // МЕТОД лениво кэширует стили кистей
+
+    // МЕТОД: кэширует стили текстов кнопок
     private static void EnsureBrushStyles()
     {
-        // 1. Предохранитель
+        // Предохранитель
         if (_s_brushBtn != null) return;
 
-        // 2. Создание безопасной копии базового стиля
+        // Стили текста кнопок
         _s_brushBtn = new GUIStyle(EditorStyles.miniButton);
-        _s_brushBtnSel = new GUIStyle(EditorStyles.miniButton);
-
-        // 3. Кастомизация стиля для выбранной кисти
+        _s_brushBtnSel = new GUIStyle(EditorStyles.miniButton);        
         _s_brushBtnSel.fontStyle = FontStyle.Bold;
         _s_brushBtnSel.normal.textColor = new Color(1f, 0.8f, 0.3f);
+
+        // Стили текста тогла
+        _s_blockToggle = new GUIStyle(EditorStyles.miniButton);
+        _s_blockToggle.normal.textColor = EditorStyles.miniButton.normal.textColor;
+        _s_blockToggle.onNormal.textColor = new Color(1f, 0.8f, 0.3f);
+        _s_blockToggle.fontStyle = FontStyle.Bold;
+
+
+
+    }
+
+    // МЕТОД: стиль для текста на маркерах
+    private static void EnsureMarkerLabelStyle()
+    {
+        if (_s_markerLabel != null) return;
+
+        _s_markerLabel = new GUIStyle(EditorStyles.boldLabel);
+        _s_markerLabel.alignment = TextAnchor.MiddleCenter;
+        _s_markerLabel.normal.textColor = Color.black;
+        _s_markerLabel.fontSize = 10;
+        _s_markerLabel.fontStyle = FontStyle.Bold;
     }
 
 
 
 
-
     // --- СТАТУСБАР ---
+    
+    // ОСНОВНОЙ МЕТОД: рисует статусбар
     private void DrawStatusBar()
     {
         // 1. Начало зоны статусбара
         GUILayout.BeginArea(new Rect(10, position.height - StatusHeight,
                                                               position.width, StatusHeight));
 
-        // 2. Определяем координаты ячейки и сохраняем в переменную
-        
+        // 2. Определяем координаты ячейки и сохраняем в переменную        
         string statText;        
 
         if (IsInBounds(_cursorCell))
         {
+            // Определяем тип маркера
+            string markerType = MarkerAt(_cursorCell); 
+
+            // Определяем тип тайла
             string tileType = _level != null
                 ? _level.GetTile(_cursorCell.x, _cursorCell.y).ToString()
                 : "-";
                         
             statText = $"Cell: ({_cursorCell.x}, {_cursorCell.y}) Tile: {tileType}";
+
+            if (!string.IsNullOrEmpty(markerType))
+            {
+                statText += $" | Marker: {markerType}";
+            }
+
         }
         else
         {
@@ -247,8 +309,49 @@ public class LevelEditorWindow : EditorWindow
     }
 
 
+    // ДОП.МЕТОД: определяет какой маркер покрывает данную клетку
+    private string MarkerAt(Vector2Int cell)
+    {
+        // Если нет данных уровня
+        if (_level == null) return "";
+        
+        // Если база
+        if (Inside(_level.BasePosition, cell)) return "Base";
+
+        // Если спавн врагов
+        var enemies = _level.EnemySpawns;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            if (Inside(enemies[i], cell)) return "Enemy" + (i + 1);
+        }
+
+        // Если спавн игроков
+        var players = _level.PlayerSpawns;
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (Inside(players[i], cell)) return "Player" + (i + 1);
+        }
+
+        // Если не маркер
+        return "";
+
+    }
+
+
+    // ДОП.МЕТОД: находится ли клетка cell внутри квадрата 2х2 (верхний левый угол в точке origin)
+    private static bool Inside(Vector2Int origin, Vector2Int cell) =>
+                                                                     cell.x >= origin.x &&
+                                                                     cell.x < origin.x + 2 &&
+                                                                     cell.y >= origin.y &&
+                                                                     cell.y < origin.y + 2;
+    
+
+
+
 
     // --- КАНВАС ---
+    
+    // ОСНОВНОЙ МЕТОД: рисует канвас
     private void DrawCanvas()
     {
         // 1. Заливка всей доступной области канваса серым цветом
@@ -287,21 +390,14 @@ public class LevelEditorWindow : EditorWindow
             EditorGUI.DrawRect(new Rect(_fieldRect.xMax - 1, _fieldRect.y, 1, _fieldRect.height),
                                BorderColor); // Право
 
+
+            // 5. Рисуем маркеры
+            DrawMarkers();
+
+            // 6. Рисуем ховер и гост-превью
+            DrawHoverAndGhost();                       
             
-            // 5. Подсветка клетки под курсором
-            if (IsInBounds(_cursorCell))
-            {
-                Vector2Int o = StampOrigin(_cursorCell);
-                int sizeRatio = _blockMode ? 2 : 1;
-                EditorGUI.DrawRect(new Rect(_fieldRect.x + o.x * _cellSize,
-                                            _fieldRect.y + o.y * _cellSize,
-                                            _cellSize * sizeRatio,
-                                            _cellSize * sizeRatio), 
-                                            HoverColor);                                            
-            }
-                       
-            
-            // 6. Напоминание назначить LevelData
+            // 7. Напоминание назначить LevelData
             if(_level == null)
             {
                 GUI.Label(new Rect(_canvasRect.x, _canvasRect.y + 2, _canvasRect.width, 18),
@@ -311,7 +407,7 @@ public class LevelEditorWindow : EditorWindow
     }
 
 
-    // МЕТОД: какого цвета должна быть клетка с координатами (х,у)
+    // ДОП.МЕТОД: какого цвета должна быть клетка с координатами (х,у)
     private Color CellColor(int x, int y)
     {
         // 1. Если есть загруженный уровень и таил не пустой - рисуем цветом
@@ -329,6 +425,8 @@ public class LevelEditorWindow : EditorWindow
         return (x + y) % 2 == 0 ? CellColorA : CellColorB;
     }
 
+    
+    // ДОП.МЕТОД: определяет цвет тайлов
     private static Color ColorForTile(TileType t) => t switch
     {
         TileType.Brick  => new Color(0.72f, 0.27f, 0.16f),
@@ -339,6 +437,123 @@ public class LevelEditorWindow : EditorWindow
         _               => CellColorA,
     };
 
+
+    // ДОП.МЕТОД: все маркеры рисуем здесь, чтобы не засерать метод отрисовки канваса
+    private void DrawMarkers()
+    {
+        // 1. Проверяем существуют ли данные уровня
+        if (_level == null) return;
+        
+        // 2. Задаем стиль текста маркеров
+        EnsureMarkerLabelStyle();
+
+        // 3. Рисуем маркер базы
+        DrawMarker(_level.BasePosition, "B", MarkerBase);
+
+        // 4. Рисуем маркеры спавна врагов
+        var enemies = _level.EnemySpawns;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            DrawMarker(enemies[i], "E" + (i + 1), MarkerEnemy);
+        }
+
+        // 4. Рисуем маркеры спавна игроков
+        var player = _level.PlayerSpawns;
+        for (int i = 0; i < player.Count; i++)
+        {
+            DrawMarker(player[i], "P" + (i + 1), MarkerPlayer);
+        }
+    }
+
+
+    // ДОП.МЕТОД: рисует один маркер 2х2 с буквой и рамкой
+    private void DrawMarker(Vector2Int origin, string label, Color bgColor)
+    {
+        // 1. Проверяем находится ли клетка в пределах игрового поля
+        if (!IsInBounds(origin)) return;
+        
+        // 2. Задаем характеристики маркера в виде прямоугольника 2х2
+        Rect rect = new Rect(_fieldRect.x + origin.x * _cellSize,
+                             _fieldRect.y + origin.y * _cellSize,
+                             _cellSize * 2,
+                             _cellSize * 2);
+
+        // 3. Рисуем маркер (прямоугольник, цвет)
+        EditorGUI.DrawRect(rect, bgColor);             
+
+        // 4. Делаем подпись маркера (прямоугольник, подпись, стиль подписи)
+        GUI.Label(rect, label, _s_markerLabel);
+    }
+
+
+    // ДОП.МЕТОД: ховер + гост-превью активного инструмента
+    private void DrawHoverAndGhost()
+    {
+        if (!IsInBounds(_cursorCell)) return;
+
+        Vector2Int origin = StampOrigin(_cursorCell);
+                
+        
+        if (_activeTool == ToolType.Brush) // Ховер для кистей
+        {
+            int sizeRatio = _blockMode ? 2 : 1;
+           
+            Rect brushRect = new (_fieldRect.x + origin.x * _cellSize, 
+                                  _fieldRect.y + origin.y * _cellSize,
+                                  _cellSize *  sizeRatio, _cellSize * sizeRatio);
+
+            Color brushColor = ColorForTile(_brush);
+            brushColor.a = 0.35f;   
+                        
+            EditorGUI.DrawRect(brushRect, brushColor);
+        }
+        else // Ховер для маркеров
+        {            
+            // Задаем прямоугольник маркера
+            Rect markerRect = new(_fieldRect.x + origin.x * _cellSize,
+                                  _fieldRect.y + origin.y * _cellSize,
+                                  _cellSize * 2, _cellSize * 2);
+
+            // Выбор цвета маркера
+            Color markerColor = _activeTool switch
+            {
+                ToolType.Base              => MarkerBase,
+                ToolType.P1 or ToolType.P2 => MarkerPlayer,
+                _                          => MarkerEnemy,
+            };
+
+            // Прозрачность маркера
+            markerColor.a = 0.5f;
+
+            // Отрисовываем маркер
+            EditorGUI.DrawRect(markerRect, markerColor);
+
+            // Задаем стиль текста на маркере
+            EnsureMarkerLabelStyle();
+            
+
+            // Задаем надпись
+            string markerLabel = _activeTool switch
+            {
+                ToolType.Base => "B",
+                ToolType.P1 => "P1",
+                ToolType.P2 => "P2",
+                ToolType.E1 => "E1",
+                ToolType.E2 => "E2",
+                ToolType.E3 => "E3",
+                _ => ""
+
+            };
+            
+            // Добавляем полупрозрачность надписи
+            Color previous = _s_markerLabel.normal.textColor;
+            _s_markerLabel.normal.textColor = new Color(previous.r, previous.g, previous.b, 0.6f);
+            
+            // Отрисовываем текст
+            GUI.Label(markerRect, markerLabel, _s_markerLabel);
+            _s_markerLabel.normal.textColor = previous;
+        }
+    }
 
 
     // --- ОБРАБОТКА ВВОДА ---
@@ -358,26 +573,35 @@ public class LevelEditorWindow : EditorWindow
 
             case EventType.MouseDown:
             {
-                if (_level == null) break;
-                if (e.button != 0 && e.button != 1) break;
+                    if (_level == null) break;
 
-                Vector2Int cell = CellAt(e.mousePosition);
-                if (!IsInBounds(cell)) break;
-                                          
-                _isPainting = true;
-                _strokeUndoRegistered = false;
-                _strokeBrush = e.button == 0 ? _brush : TileType.Empty;
-                _lastPaintedCell = cell;
-                PaintCell(cell, _strokeBrush);
-                e.Use();
-                Repaint();
-                break;
+                    Vector2Int cell = CellAt(e.mousePosition);
+
+                    if (!IsInBounds(cell)) break;
+
+                    if(_activeTool == ToolType.Brush)
+                    {
+                        if (e.button != 0 && e.button != 1) break;
+                        _isPainting = true;
+                        _strokeUndoRegistered = false;
+                        _strokeBrush = e.button == 0 ? _brush : TileType.Empty;
+                        _lastPaintedCell = cell;
+                        PaintCell(cell, _strokeBrush);
+                    }
+                    else if (e.button == 0)
+                    {
+                        ApplyMarker(cell, _activeTool);
+                    }
+
+                    e.Use();
+                    Repaint();
+                    break;                   
             }
 
             case EventType.MouseDrag:
             {
                 UpdateCursor(CellAt(e.mousePosition));  
-                if (!_isPainting) break;
+                if (!_isPainting || _activeTool != ToolType.Brush) break;
 
                 Vector2Int cell = CellAt(e.mousePosition);
 
@@ -408,7 +632,7 @@ public class LevelEditorWindow : EditorWindow
     }
 
 
-    // МЕТОД: ховер курсора
+    // ДОП.МЕТОД: ховер курсора
     private void UpdateCursor(Vector2Int cell)
     {
         if (cell == _cursorCell) return;
@@ -417,7 +641,7 @@ public class LevelEditorWindow : EditorWindow
     }
 
     
-    // МЕТОД: раскрашивает клетки
+    // ДОП.МЕТОД: раскрашивает клетки
     private void PaintCell(Vector2Int cell, TileType brush)
     {
         Vector2Int origin = StampOrigin(cell);
@@ -426,7 +650,7 @@ public class LevelEditorWindow : EditorWindow
         for (int dy = 0; dy < sizeRatio; dy++)
         for (int dx = 0; dx < sizeRatio; dx++)
         {
-            Vector2Int c = new Vector2Int(origin.x + dx, origin.y + dy);
+            Vector2Int c = new (origin.x + dx, origin.y + dy);
             
             if (!IsInBounds(c)) continue;
             if (_level.GetTile(c.x, c.y) == brush) continue;
@@ -447,7 +671,7 @@ public class LevelEditorWindow : EditorWindow
     }
 
 
-    // МЕТОД: рисует линии по алгоритму Брезенхэма
+    // ДОП.МЕТОД: рисует линии по алгоритму Брезенхэма
     private void PaintLine(Vector2Int from, Vector2Int to, TileType brush)
     {
         int x0 = from.x, y0 = from.y;                         // Начальная точка
@@ -467,10 +691,46 @@ public class LevelEditorWindow : EditorWindow
     }
 
 
-    // МЕТОД: выравнивает клетки к началу блока 2х2
+    // ДОП.МЕТОД: выравнивает клетки к началу блока 2х2
     private Vector2Int StampOrigin(Vector2Int cell) =>
         _blockMode ? new Vector2Int(cell.x & ~1, cell.y & ~1) : cell;
        
+
+    // ДОП.МЕТОД: установка маркера с undo
+    private void ApplyMarker(Vector2Int cell, ToolType tool)
+    {
+        Vector2Int origin = StampOrigin(cell);
+
+        Undo.RegisterCompleteObjectUndo(_level, "Move marker");
+
+        switch (tool)
+        {
+            case ToolType.Base:
+                _level.SetBasePosition(origin);
+                    break;
+            case ToolType.P1:
+                _level.SetPlayerSpawn(0, origin);
+                break;
+            case ToolType.P2:
+                _level.SetPlayerSpawn(1, origin);
+                break;
+            case ToolType.E1:
+                _level.SetEnemySpawn(0, origin);
+                break;
+            case ToolType.E2:
+                _level.SetEnemySpawn(1, origin);
+                break;
+            case ToolType.E3:
+                _level.SetEnemySpawn(2, origin);
+                break;
+        }
+
+        EditorUtility.SetDirty(_level);
+    }
+
+
+
+
 
     
 
