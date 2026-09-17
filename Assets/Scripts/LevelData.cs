@@ -72,6 +72,9 @@ public class LevelData : ScriptableObject
 
     // --- СЕТТЕРЫ ---
 
+    // Сеттер номера уровня
+    public void SetLevelNumber(int value) => _levelNumber = Mathf.Max(1, value);    
+    
     // Сеттер позиции базы
     public void SetBasePosition (Vector2Int pos) => _basePosition = pos;
     

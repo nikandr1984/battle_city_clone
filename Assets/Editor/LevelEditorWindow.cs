@@ -7,15 +7,16 @@ using Unity.VisualScripting;
 
 public class LevelEditorWindow : EditorWindow
 {    
-    private const int FieldWidth = LevelData.FieldWidth;   // Ширина игрового поля
+    private const int FieldWidth = LevelData.FieldWidth;    // Ширина игрового поля
     private const int FieldHeight = LevelData.FieldHeight;  // Высота игрового поля
 
-    private const float ToolbarHeight = 24f;    // Высота тулбара в пикселях
-    private const float StatusHeight = 20f;     // Высота статус бара в пикселях
-    private const float PaletteWidth = 110f;    // Ширина панели кистей
-    private const float ValidationWidth = 230f; // Ширина панели валидации
-    private const float MinCellSize = 8f;       // Мин.размер клетки в пикселях
-    private const float MaxCellSize = 32f;      // Макс.размер клетки в пикселях
+    private const float ToolbarHeight = 24f;             // Высота тулбара в пикселях
+    private const float StatusHeight = 20f;              // Высота статус бара в пикселях
+    private const float PaletteWidth = 110f;             // Ширина панели кистей
+    private const float ValidationWidth = 230f;          // Ширина панели валидации
+    private const float MinCellSize = 8f;                // Мин.размер клетки в пикселях
+    private const float MaxCellSize = 32f;               // Макс.размер клетки в пикселях
+    private const string LevelsFolder = "Assets/Levels"; // Путь к папке с уровнями
 
     private enum ToolType { Brush, Base, P1, P2, E1, E2, E3 }  // Типы инструментов редактора
     private enum Severity { Info, Warning, Error }  // Типы предупреждений
@@ -133,45 +134,92 @@ public class LevelEditorWindow : EditorWindow
     // --- ТУЛБАР ---
     private void DrawToolbar()
     {
-        // 1. Команда начала зоны тулбара
+        // Команда начала зоны тулбара
         GUILayout.BeginArea(new Rect(0, 0, position.width, ToolbarHeight), EditorStyles.toolbar);
         
-        // 2. Делаем зону горизонтальной
+        // Делаем зону горизонтальной
         GUILayout.BeginHorizontal();
 
-        // 3. Создаем поле для перетаскивания ассета
-        LevelData picked = EditorGUILayout.ObjectField(
+        // Создаем поле для перетаскивания ассета
+        LevelData pickedAsset = EditorGUILayout.ObjectField(
                                _level,                 // Текущее значение
                                typeof(LevelData),      // Допустимый тип
                                false,                  // Разрешить ли объекты сцены
                                GUILayout.Width(200))   // Размер поля
                                as LevelData;           // Каст чтобы возвращал только этот тип
        
-        if (picked != _level)
+        // Делаем выбранный ассет уровня активным
+        if (pickedAsset != _level)
         {
-            _level = picked;
+            _level = pickedAsset;
             Repaint();
         }
 
+
+        // -- Начало панели управления ассетами --
+        // Создаем отсортированный список всех ассетов 
+        var levels = GetAllLevelsSorted();
         
-        // 4. Делаем метку Zoom
+        // Ищем индекс текущего уровня в этом списке
+        int index = _level != null ? levels.IndexOf(_level) : -1;
+
+        // Создаем кнопку "Назад"
+        using (new EditorGUI.DisabledScope(index <= 0)) // using управляет активностью кнопки
+        {
+            if (GUILayout.Button("<", EditorStyles.toolbarButton, GUILayout.Width(20)))
+            {
+                _level = levels[index - 1];
+                Repaint();
+            }
+        }
+
+        // Создаем кнопку "Вперед"
+        using (new EditorGUI.DisabledScope(index < 0 || index >= levels.Count - 1))
+        {
+            if(GUILayout.Button(">", EditorStyles.toolbarButton, GUILayout.Width(20)))
+            {
+                _level = levels[index + 1];
+                Repaint();
+            }
+        }
+
+        // Создаем индикатор позиции -/-
+        GUILayout.Label(index >= 0 ? $"{index + 1}/{levels.Count}" : "-", GUILayout.Width(40));
+
+        // Создаем кнопку "New"
+        if (GUILayout.Button("New", EditorStyles.toolbarButton, GUILayout.Width(40))) 
+        {
+            CreateNewLavel();
+        }
+
+        // Создаем кнопку "Duplicate"
+        using (new EditorGUI.DisabledScope(_level == null))
+        {
+            if (GUILayout.Button("Dup", EditorStyles.toolbarButton, GUILayout.Width(40))) 
+            {
+                DuplicateCurrentLevel();
+            }
+        }
+        // -- Конец панели управления ассетами --
+
+        // Делаем метку Zoom
         GUILayout.Label("Zoom", GUILayout.Width(40));
 
-        // 5. Делаем слайдер зума
+        // Делаем слайдер зума
         _cellSize = GUILayout.HorizontalSlider(_cellSize, MinCellSize, MaxCellSize,
                                                                             GUILayout.Width(160));
             
-        // 6. Делаем метку с текущим значением зума
+        // Делаем метку с текущим значением зума
         GUILayout.Label($"{_cellSize:0}px", GUILayout.Width(40));
 
-        // 7. Делаем переключатель сетки
+        // Делаем переключатель сетки
         _showGrid = GUILayout.Toggle(_showGrid, "Grid", EditorStyles.toolbarButton, 
                                                                              GUILayout.Width(60));  
         
-        // 8. Закрываем горизонтальную зону
+        // Закрываем горизонтальную зону
         GUILayout.EndHorizontal();
 
-        // 9. Закрываем зону тулбара
+        // Закрываем зону тулбара
         GUILayout.EndArea();
     }
 
@@ -958,8 +1006,122 @@ public class LevelEditorWindow : EditorWindow
 
 
 
+    // --- РАБОТА С АССЕТАМИ УРОВНЕЙ --- 
+
+    // МЕТОД: гарантирует существование папки с ассетами уровней
+    private static void EnsureLevelsFolder()
+    {
+        if (AssetDatabase.IsValidFolder(LevelsFolder)) return;
+        AssetDatabase.CreateFolder("Assets", "Levels");
+    }
 
 
+    // МЕТОД: возвращает отсортированный список уровней в папке Levels
+    private static List<LevelData> GetAllLevelsSorted()
+    {
+        // Создаем пустой список для ассетов
+        var listAssets = new List<LevelData>();
+               
+        // Ищем ассеты уровней в проекте и возвращаем массив GUID  
+        string[] guids = AssetDatabase.FindAssets("t:LevelData", new[] { LevelsFolder });
+        
+        // Проходим по каждому GUID
+        foreach (string guid in guids)
+        {
+            // Превращает GUID обратно в путь к файлу 
+            var data = AssetDatabase.LoadAssetAtPath<LevelData>(AssetDatabase.GUIDToAssetPath(guid));
+            
+            // Добавляем в список успешно загруженный ассет
+            if (data != null) listAssets.Add(data);
+        }
+
+        // Сортируем список по номеру и по названию
+        listAssets.Sort((a, b) =>
+        {
+            int cmp = a.LevelNumber.CompareTo(b.LevelNumber);
+            return cmp != 0 ? cmp : string.Compare(a.name, b.name, System.StringComparison.Ordinal);
+        });
+
+        return listAssets;
+    }
+
+
+    // МЕТОД: присваивает свободный номер ассету уровня
+    private static int NextFreeNumber(List<LevelData> levels)
+    {
+        int next = 1;
+        
+        foreach (var I in levels)
+        {
+            next = Mathf.Max(next, I.LevelNumber + 1);
+        }
+
+        return next;
+    }
+
+
+    // МЕТОД: создает новый ассет уровня
+    private void CreateNewLavel()
+    {
+        // Вызываем метод, гарантирующий существование папки с ассетами 
+        EnsureLevelsFolder();
+
+        // Создаем следующий номер ассета и присваиваем его переменной
+        int number = NextFreeNumber(GetAllLevelsSorted());
+
+        // Создаем новый ассет и сохраняем его в переменную
+        var data = ScriptableObject.CreateInstance<LevelData>();
+
+        // Сохраняем номер кровня в ассет
+        data.SetLevelNumber(number);
+
+        // Сохраняем ассет на диск
+        SaveLevelAsset(data, number);
+    }
+
+
+    // МЕТОД: сохраняет ассет уровня
+    private void SaveLevelAsset(LevelData data, int number)
+    {
+        // Собираем путь к файлу и сохраняем в переменную
+        string path = AssetDatabase.GenerateUniqueAssetPath($"{LevelsFolder}/Level_{number:d2}.asset");
+
+        // Создаем файл ассета по указанному пути
+        AssetDatabase.CreateAsset(data, path);
+
+        // Сохраняем ассет
+        AssetDatabase.SaveAssets();
+
+        // Делаем только что созданный ассет текущим в редакторе
+        _level = data;
+
+        // Принудительно перерисовываем окно
+        Repaint();
+    }
+
+
+    // Создает дупликат текущего уровня, но с новым уровнем 
+    private void DuplicateCurrentLevel()
+    {
+        // Защита
+        if (_level == null) return;
+
+        // Гарантируем наличие папки для ассетов
+        EnsureLevelsFolder();
+
+        // Вычисляем следующий свободный номер
+        int number = NextFreeNumber(GetAllLevelsSorted());
+
+        // Делаем глубокую копию ассета
+        var copy = Object.Instantiate(_level);
+
+        // Присваиваем новый номер
+        copy.SetLevelNumber(number);
+
+        // Сохраняем на диск
+        SaveLevelAsset(copy, number);
+
+    }
     
 
     // --- ХЕЛПЕРЫ ---
