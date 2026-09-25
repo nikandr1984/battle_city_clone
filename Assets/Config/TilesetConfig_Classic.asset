@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8df1c8cffd9a0d4f8bdc5032e526b13, type: 3}
+  m_Name: TilesetConfig_Classic
+  m_EditorClassIdentifier: Assembly-CSharp::TilesetConfig
+  _entries:
+  - type: 0
+    tile: {fileID: 0}
+    sprite: {fileID: 0}
+    color: {r: 0.22, g: 0.22, b: 0.24, a: 1}
+  - type: 1
+    tile: {fileID: 11400000, guid: 8fde5cf9d058f4348afab5183247fe3b, type: 2}
+    sprite: {fileID: -1572391234087474867, guid: 5b21c4981e3621f4796ea0678ebf7853, type: 3}
+    color: {r: 0.72, g: 0.27, b: 0.16, a: 1}
+  - type: 2
+    tile: {fileID: 11400000, guid: 282f452be1c26d044a91eb944b8103d5, type: 2}
+    sprite: {fileID: -1062848816298764035, guid: b000fba068647b54bad5cf033ad2204c, type: 3}
+    color: {r: 0.75, g: 0.75, b: 0.78, a: 1}
+  - type: 3
+    tile: {fileID: 11400000, guid: 054b2d12e8e4ef64a99f68a5aa4a7a34, type: 2}
+    sprite: {fileID: 519535645060365707, guid: b000fba068647b54bad5cf033ad2204c, type: 3}
+    color: {r: 0.15, g: 0.35, b: 0.9, a: 1}
+  - type: 4
+    tile: {fileID: 11400000, guid: b21fc21097f7f3c4d8a2a93304e182fb, type: 2}
+    sprite: {fileID: -821167355240183018, guid: b000fba068647b54bad5cf033ad2204c, type: 3}
+    color: {r: 0.16, g: 0.5, b: 0.2, a: 1}
+  - type: 5
+    tile: {fileID: 11400000, guid: 1427203005325df4e93a7cbc54600108, type: 2}
+    sprite: {fileID: -8106014855011599515, guid: b000fba068647b54bad5cf033ad2204c, type: 3}
+    color: {r: 0.6, g: 0.85, b: 0.95, a: 1}

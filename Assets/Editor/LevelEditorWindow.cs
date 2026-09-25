@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Unity.Hierarchy.Editor;
 using UnityEngine.Rendering.VirtualTexturing;
 using Unity.VisualScripting;
+using UnityEditor.ShaderGraph.Internal;
 
 public class LevelEditorWindow : EditorWindow
 {    
@@ -12,7 +13,7 @@ public class LevelEditorWindow : EditorWindow
 
     private const float ToolbarHeight = 24f;             // Высота тулбара в пикселях
     private const float StatusHeight = 20f;              // Высота статус бара в пикселях
-    private const float PaletteWidth = 110f;             // Ширина панели кистей
+    private const float PaletteWidth = 140f;             // Ширина панели кистей
     private const float ValidationWidth = 230f;          // Ширина панели валидации
     private const float MinCellSize = 8f;                // Мин.размер клетки в пикселях
     private const float MaxCellSize = 32f;               // Макс.размер клетки в пикселях
@@ -28,6 +29,7 @@ public class LevelEditorWindow : EditorWindow
     [SerializeField] private TileType _brush = TileType.Brick;      // Текущая кисть
     [SerializeField] private bool _blockMode;                       // Режим штампа 2х2
     [SerializeField] private ToolType _activeTool = ToolType.Brush; // Активный инструмент
+    [SerializeField] private TilesetConfig _tileset;                // Ссылка на конфиг тайлсета
 
 
     private Rect _canvasRect;                      // Область холста
@@ -120,7 +122,7 @@ public class LevelEditorWindow : EditorWindow
                                    ValidationWidth, position.height - ToolbarHeight - StatusHeight);
 
         // 2. Вычисление размера поля в пикселях
-        Vector2 fieldSize = new(FieldWidth * _cellSize, FieldWidth * _cellSize);
+        Vector2 fieldSize = new(FieldWidth * _cellSize, FieldHeight * _cellSize);
 
         // 3. Центрирование поля
         float ox = _canvasRect.x + Mathf.Max(0f, (_canvasRect.width - fieldSize.x) / 2f);
@@ -259,16 +261,27 @@ public class LevelEditorWindow : EditorWindow
                     _activeTool = ToolType.Brush;
                 }                
             }
-
-            
+                        
 
             // 6. Переключатель режима штампа
             GUILayout.Space(10);
 
-            _blockMode = GUILayout.Toggle(_blockMode, "Block 2x2", _s_blockToggle, GUILayout.Height(20));            
+            _blockMode = GUILayout.Toggle(_blockMode, "Block 2x2", _s_blockToggle, GUILayout.Height(20));
+
+
+            // 7. Поле для Tileset
+            GUILayout.Space(10);
+            GUILayout.Label("Tileset", EditorStyles.boldLabel);
+            TilesetConfig pickedSet = EditorGUILayout.ObjectField(_tileset, 
+                typeof(TilesetConfig), false) as TilesetConfig;
+            if (pickedSet != _tileset)
+            {
+                _tileset = pickedSet;
+                Repaint();
+            }
+
             
-            
-            // 7. Отрисовываем кнопки маркеров
+            // 8. Отрисовываем кнопки маркеров
             GUILayout.Space(10);
             GUILayout.Label("Маркеры", EditorStyles.boldLabel);
             GUILayout.Space(1);
@@ -633,11 +646,11 @@ public class LevelEditorWindow : EditorWindow
         // 1. Заливка всей доступной области канваса серым цветом
         EditorGUI.DrawRect(_canvasRect, BgColor);
 
-        // 2. Отрисовка клеток шахматкой
+        // 2. Отрисовка тайлов
         for (int y = 0; y < FieldHeight; y++)
         for (int x = 0; x < FieldWidth; x++)
         {
-            EditorGUI.DrawRect(CellRect(x, y), CellColor(x, y));           
+           DrawTileCell(x, y);         
         }
 
         // 3. Отрисовка сетки (линий)
@@ -653,57 +666,80 @@ public class LevelEditorWindow : EditorWindow
             {
                 EditorGUI.DrawRect(new Rect(_fieldRect.x, _fieldRect.y + y * _cellSize,
                                             _fieldRect.width, 1), GridColor);
-            }
-
-
-            // 4. Отрисовка рамки поля
-            EditorGUI.DrawRect(new Rect(_fieldRect.x, _fieldRect.yMin, _fieldRect.width, 1), 
-                               BorderColor); // Верх
-            EditorGUI.DrawRect(new Rect(_fieldRect.x, _fieldRect.yMax - 1, _fieldRect.width, 1),
-                               BorderColor); // Низ
-            EditorGUI.DrawRect(new Rect(_fieldRect.xMin, _fieldRect.y, 1, _fieldRect.height),
-                               BorderColor); // Лево
-            EditorGUI.DrawRect(new Rect(_fieldRect.xMax - 1, _fieldRect.y, 1, _fieldRect.height),
-                               BorderColor); // Право
-
-
-            // 5. Рисуем маркеры
-            DrawMarkers();
-
-            // 6. Рисуем ховер и гост-превью
-            DrawHoverAndGhost();                       
-            
-            // 7. Напоминание назначить LevelData
-            if(_level == null)
-            {
-                GUI.Label(new Rect(_canvasRect.x, _canvasRect.y + 2, _canvasRect.width, 18),
-                    "Назначь LevelData в тулбаре", EditorStyles.centeredGreyMiniLabel);
-            }
+            }                    
+                        
         }
+
+        // 4. Отрисовка рамки поля
+        EditorGUI.DrawRect(new Rect(_fieldRect.x, _fieldRect.yMin, _fieldRect.width, 1),
+                           BorderColor); // Верх
+        EditorGUI.DrawRect(new Rect(_fieldRect.x, _fieldRect.yMax - 1, _fieldRect.width, 1),
+                           BorderColor); // Низ
+        EditorGUI.DrawRect(new Rect(_fieldRect.xMin, _fieldRect.y, 1, _fieldRect.height),
+                           BorderColor); // Лево
+        EditorGUI.DrawRect(new Rect(_fieldRect.xMax - 1, _fieldRect.y, 1, _fieldRect.height),
+                           BorderColor); // Право     
+
+        // 5. Рисуем маркеры
+        DrawMarkers();
+
+        // 6. Рисуем ховер и гост-превью
+        DrawHoverAndGhost();
+
     }
 
 
-    // ДОП.МЕТОД: какого цвета должна быть клетка с координатами (х,у)
-    private Color CellColor(int x, int y)
+    // ДОП.МЕТОД: отрисовка одной клетки - спрайт из конфига или фолбэк
+    private void DrawTileCell(int x, int y)
     {
-        // 1. Если есть загруженный уровень и таил не пустой - рисуем цветом
-        if (_level != null)
-        {
-            TileType t = _level.GetTile(x, y);
+        Rect rect = CoordToPixelRect(x, y);
+        TileType tileType = _level != null ? _level.GetTile(x, y) : TileType.Empty;
 
-            if (t != TileType.Empty)
-            {
-                return ColorForTile(t);
-            }               
+        // Пустые клетки всегда шахматкой - это фон, у него нет спрайта
+        if (tileType == TileType.Empty)
+        {
+            EditorGUI.DrawRect(rect, (x + y) % 2 == 0 ? CellColorA : CellColorB);
+            return;
         }
 
-        // 2. Если уровень не загружен или таил пустой - рисуем шахматкой
-        return (x + y) % 2 == 0 ? CellColorA : CellColorB;
+        Sprite sprite = _tileset != null ? _tileset.GetSprite(tileType) : null;        
+        
+        if (sprite != null)
+        {            
+            DrawSprite(rect, sprite);
+        }
+        else
+        {           
+            EditorGUI.DrawRect(rect, ColorForTile(tileType));
+        }
     }
+
+    // ДОП.МЕТОД: рисование подректа спрайта из атласа в IMGUI
+    private static void DrawSprite(Rect screenRect, Sprite sprite)
+    // screenRect - прямоугольник  на экране редактора (в пикселях), куда помещается картинка
+    {
+        Texture2D texture2D = sprite.texture;               
+
+        if (texture2D == null) return;
+
+        // UV-rect спрайта внутри атласа (в долях от размера текстуры)
+        Rect uvRect = new Rect(sprite.rect.x / texture2D.width,
+                               sprite.rect.y / texture2D.height,
+                               sprite.rect.width / texture2D.width,
+                               sprite.rect.height / texture2D.height);             
+
+        GUI.DrawTextureWithTexCoords(screenRect, texture2D, uvRect);
+    }
+     
 
     
     // ДОП.МЕТОД: определяет цвет тайлов
-    private static Color ColorForTile(TileType t) => t switch
+    private Color ColorForTile(TileType tileType) =>
+        _tileset != null ? _tileset.GetColor(tileType) : FallbackColorForTile(tileType);
+
+
+    // ДОП.МЕТОД: определяет цвет тайлов, когда _tileset не задан
+    private static Color FallbackColorForTile(TileType tileType) => tileType switch
     {
         TileType.Brick  => new Color(0.72f, 0.27f, 0.16f),
         TileType.Steel  => new Color(0.75f, 0.75f, 0.78f),
@@ -778,10 +814,21 @@ public class LevelEditorWindow : EditorWindow
                                   _fieldRect.y + origin.y * _cellSize,
                                   _cellSize *  sizeRatio, _cellSize * sizeRatio);
 
-            Color brushColor = ColorForTile(_brush);
-            brushColor.a = 0.35f;   
-                        
-            EditorGUI.DrawRect(brushRect, brushColor);
+            Sprite sprite = _tileset != null ? _tileset.GetSprite(_brush) : null;
+            
+            if (_brush != TileType.Empty &&  sprite != null)
+            {
+                Color prevGui = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, 0.5f);
+                DrawSprite(brushRect, sprite);
+                GUI.color = prevGui;
+            }
+            else
+            {
+                Color tileColor = ColorForTile(_brush);
+                tileColor.a = 0.35f;
+                EditorGUI.DrawRect(brushRect, tileColor);
+            }
         }
         else // Ховер для маркеров
         {            
@@ -1127,7 +1174,7 @@ public class LevelEditorWindow : EditorWindow
     // --- ХЕЛПЕРЫ ---
 
     // I. Конвертор координат тайлов (логические в пиксели)
-    private Rect CellRect(int x, int y)
+    private Rect CoordToPixelRect(int x, int y)
     {
         return new(_fieldRect.x + x * _cellSize, // Левый край (Х)
                    _fieldRect.y + y * _cellSize, // Верхний край (Y)
