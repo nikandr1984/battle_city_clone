@@ -12,14 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a8df1c8cffd9a0d4f8bdc5032e526b13, type: 3}
   m_Name: TilesetConfig_Classic
   m_EditorClassIdentifier: Assembly-CSharp::TilesetConfig
-  _entries:
+  _entriesTiles:
   - type: 0
     tile: {fileID: 0}
     sprite: {fileID: 0}
     color: {r: 0.22, g: 0.22, b: 0.24, a: 1}
   - type: 1
     tile: {fileID: 11400000, guid: 8fde5cf9d058f4348afab5183247fe3b, type: 2}
-    sprite: {fileID: -1572391234087474867, guid: 5b21c4981e3621f4796ea0678ebf7853, type: 3}
+    sprite: {fileID: -2807560171804270230, guid: b000fba068647b54bad5cf033ad2204c, type: 3}
     color: {r: 0.72, g: 0.27, b: 0.16, a: 1}
   - type: 2
     tile: {fileID: 11400000, guid: 282f452be1c26d044a91eb944b8103d5, type: 2}
@@ -37,3 +37,8 @@ MonoBehaviour:
     tile: {fileID: 11400000, guid: 1427203005325df4e93a7cbc54600108, type: 2}
     sprite: {fileID: -8106014855011599515, guid: b000fba068647b54bad5cf033ad2204c, type: 3}
     color: {r: 0.6, g: 0.85, b: 0.95, a: 1}
+  eagleSprites:
+  - {fileID: -8877993649411661024, guid: b000fba068647b54bad5cf033ad2204c, type: 3}
+  - {fileID: -4544058533819703147, guid: b000fba068647b54bad5cf033ad2204c, type: 3}
+  - {fileID: -203875927127507863, guid: b000fba068647b54bad5cf033ad2204c, type: 3}
+  - {fileID: 953550883137103540, guid: b000fba068647b54bad5cf033ad2204c, type: 3}

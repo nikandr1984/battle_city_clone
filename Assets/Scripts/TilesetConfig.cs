@@ -6,7 +6,7 @@ using UnityEngine.Tilemaps;
 public class TilesetConfig : ScriptableObject
 {
     [System.Serializable]
-    public class Entry
+    public class EntryTile
     {
         public TileType type;
 
@@ -14,29 +14,33 @@ public class TilesetConfig : ScriptableObject
         public TileBase tile;
 
         [Tooltip("Спрайт для превью в редакторе уровней")]
-        public Sprite sprite;
+        public Sprite sprite;        
 
         [Tooltip("Фолбэк-цвет: когда спрайт не назначен или конфига нет")]
         public Color color = Color.gray;
-    }
+    }    
 
 
     [SerializeField]
-    private Entry[] _entries = new Entry[]
+    private EntryTile[] _entriesTiles = new EntryTile[]
     {
-        new Entry { type = TileType.Empty,  color = new (0.22f, 0.22f, 0.24f) },
-        new Entry { type = TileType.Brick,  color = new (0.72f, 0.27f, 0.16f) },
-        new Entry { type = TileType.Steel,  color = new (0.75f, 0.75f, 0.78f) },
-        new Entry { type = TileType.Water,  color = new (0.15f, 0.35f, 0.90f) },
-        new Entry { type = TileType.Forest, color = new (0.16f, 0.50f, 0.20f) },
-        new Entry { type = TileType.Ice,    color = new (0.60f, 0.85f, 0.95f) },
+        new EntryTile { type = TileType.Empty,  color = new (0.22f, 0.22f, 0.24f) },
+        new EntryTile { type = TileType.Brick,  color = new (0.72f, 0.27f, 0.16f) },
+        new EntryTile { type = TileType.Steel,  color = new (0.75f, 0.75f, 0.78f) },
+        new EntryTile { type = TileType.Water,  color = new (0.15f, 0.35f, 0.90f) },
+        new EntryTile { type = TileType.Trees,  color = new (0.16f, 0.50f, 0.20f) },
+        new EntryTile { type = TileType.Ice,    color = new (0.60f, 0.85f, 0.95f) },
     };
 
-    
+
+    [Tooltip("Спрайты орла для маркера базы (TL, TR, BL, BR)")]
+    public Sprite[] eagleSprites = new Sprite[4];
+
+
     // МЕТОД: линейный поиск
-    public Entry Get(TileType type)
+    public EntryTile Get(TileType type)
     {
-        foreach (Entry e in _entries)
+        foreach (EntryTile e in _entriesTiles)
         {
             if (e.type == type)
             {                
@@ -47,14 +51,13 @@ public class TilesetConfig : ScriptableObject
     }
 
     
-    // Геттеры
-    
+    // ГЕТТЕРЫ    
     public TileBase GetTile(TileType type) => Get(type)?.tile;
     public Sprite GetSprite(TileType type) => Get(type)?.sprite;
 
     public Color GetColor(TileType type)
     {
-        Entry e = Get(type);
+        EntryTile e = Get(type);
         return e != null ? e.color : Color.gray;
     }
    

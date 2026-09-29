@@ -24,12 +24,13 @@ public class LevelEditorWindow : EditorWindow
     
 
     [SerializeField] private LevelData _level;                      // Ссылка на ассет с данными уровня
-    [SerializeField] private float _cellSize = 16f;                 // Размер клетки в пикселях
-    [SerializeField] private bool _showGrid = true;                 // Статус отрисовки сетки
-    [SerializeField] private TileType _brush = TileType.Brick;      // Текущая кисть
-    [SerializeField] private bool _blockMode;                       // Режим штампа 2х2
+    [SerializeField] private float _cellSize = 16f;                 // Размер клетки в пикселях    
+    [SerializeField] private TileType _brush = TileType.Brick;      // Текущая кисть    
     [SerializeField] private ToolType _activeTool = ToolType.Brush; // Активный инструмент
     [SerializeField] private TilesetConfig _tileset;                // Ссылка на конфиг тайлсета
+    [SerializeField] private bool _showGrid = true;                 // Статус отрисовки сетки
+    [SerializeField] private bool _blockMode;                       // Режим штампа 2х2
+    [SerializeField] private bool _showScreenFrame = true;          // Показать рамку экрана
 
 
     private Rect _canvasRect;                      // Область холста
@@ -54,12 +55,12 @@ public class LevelEditorWindow : EditorWindow
     private static GUIStyle _s_valTitle;     // Стиль для списка валидации (подпись)
     private static GUIStyle _s_valItem;      // Стиль для списка валидации (значение)
 
-    // Палитра тайлов
+    // Палитра канваса
     private static readonly Color BgColor     = new(0.16f, 0.16f, 0.16f);        // Цвет окна
     private static readonly Color CellColorA  = new(0.22f, 0.22f, 0.24f);        // Цвет ячейки А
     private static readonly Color CellColorB  = new(0.25f, 0.25f, 0.28f);        // Цвет ячейки В
     private static readonly Color GridColor   = new(0.40f, 0.40f, 0.49f, 0.35f); // Цвет сетки
-    private static readonly Color BorderColor = new(0.90f, 0.60f, 0.10f);        // Цвет рамки    
+    private static readonly Color FrameColor  = new (0.459f, 0.459f, 0.459f);    // Цвет UI-рамки    
 
     // Палитра маркеров
     private static readonly Color MarkerBase   = new(0.95f, 0.75f, 0.20f);  // Маркер базы
@@ -216,7 +217,11 @@ public class LevelEditorWindow : EditorWindow
 
         // Делаем переключатель сетки
         _showGrid = GUILayout.Toggle(_showGrid, "Grid", EditorStyles.toolbarButton, 
-                                                                             GUILayout.Width(60));  
+                      GUILayout.Width(60));
+
+        // Делаем переключатель превью рамки
+        _showScreenFrame = GUILayout.Toggle(_showScreenFrame, "Screen Frame",
+                             EditorStyles.toolbarButton, GUILayout.Width(90));
         
         // Закрываем горизонтальную зону
         GUILayout.EndHorizontal();
@@ -637,7 +642,6 @@ public class LevelEditorWindow : EditorWindow
     };
 
 
-
     // --- КАНВАС ---
     
     // ОСНОВНОЙ МЕТОД: рисует канвас
@@ -646,14 +650,17 @@ public class LevelEditorWindow : EditorWindow
         // 1. Заливка всей доступной области канваса серым цветом
         EditorGUI.DrawRect(_canvasRect, BgColor);
 
-        // 2. Отрисовка тайлов
+        // 2. Отрисовка UI рамки
+        DrawScreenFrame();
+        
+        // 3. Отрисовка тайлов
         for (int y = 0; y < FieldHeight; y++)
         for (int x = 0; x < FieldWidth; x++)
         {
            DrawTileCell(x, y);         
         }
 
-        // 3. Отрисовка сетки (линий)
+        // 4. Отрисовка сетки (grid)
         if (_showGrid)
         {
             for (int x = 1; x < FieldWidth; x++)
@@ -666,19 +673,8 @@ public class LevelEditorWindow : EditorWindow
             {
                 EditorGUI.DrawRect(new Rect(_fieldRect.x, _fieldRect.y + y * _cellSize,
                                             _fieldRect.width, 1), GridColor);
-            }                    
-                        
-        }
-
-        // 4. Отрисовка рамки поля
-        EditorGUI.DrawRect(new Rect(_fieldRect.x, _fieldRect.yMin, _fieldRect.width, 1),
-                           BorderColor); // Верх
-        EditorGUI.DrawRect(new Rect(_fieldRect.x, _fieldRect.yMax - 1, _fieldRect.width, 1),
-                           BorderColor); // Низ
-        EditorGUI.DrawRect(new Rect(_fieldRect.xMin, _fieldRect.y, 1, _fieldRect.height),
-                           BorderColor); // Лево
-        EditorGUI.DrawRect(new Rect(_fieldRect.xMax - 1, _fieldRect.y, 1, _fieldRect.height),
-                           BorderColor); // Право     
+            }     
+        }              
 
         // 5. Рисуем маркеры
         DrawMarkers();
@@ -686,6 +682,30 @@ public class LevelEditorWindow : EditorWindow
         // 6. Рисуем ховер и гост-превью
         DrawHoverAndGhost();
 
+    }
+
+
+    // ДОП.МЕТОД: рисуем UI-рамку 
+    private void DrawScreenFrame()
+    {
+        if (!_showScreenFrame) return;
+
+        const int screenWidth = 32;
+        const int screenHeight = 28;
+        const int fieldOffsetX = 2;
+        const int fieldOffsetY = 1;
+
+        // Позиция рамки в пикселях окна
+        float frameX = _fieldRect.x - fieldOffsetX * _cellSize;
+        float frameY = _fieldRect.y - fieldOffsetY * _cellSize;
+        float frameWidth = screenWidth * _cellSize;
+        float frameHeight = screenHeight * _cellSize;
+
+        // Прямоугольник рамки
+        Rect screenRect = new Rect(frameX, frameY, frameWidth, frameHeight);            
+
+        // Отрисовываем рамку
+        EditorGUI.DrawRect(screenRect, FrameColor);
     }
 
 
@@ -729,10 +749,9 @@ public class LevelEditorWindow : EditorWindow
                                sprite.rect.height / texture2D.height);             
 
         GUI.DrawTextureWithTexCoords(screenRect, texture2D, uvRect);
-    }
-     
+    }           
 
-    
+
     // ДОП.МЕТОД: определяет цвет тайлов
     private Color ColorForTile(TileType tileType) =>
         _tileset != null ? _tileset.GetColor(tileType) : FallbackColorForTile(tileType);
@@ -744,10 +763,36 @@ public class LevelEditorWindow : EditorWindow
         TileType.Brick  => new Color(0.72f, 0.27f, 0.16f),
         TileType.Steel  => new Color(0.75f, 0.75f, 0.78f),
         TileType.Water  => new Color(0.15f, 0.35f, 0.90f),
-        TileType.Forest => new Color(0.16f, 0.50f, 0.20f),
+        TileType.Trees => new Color(0.16f, 0.50f, 0.20f),
         TileType.Ice    => new Color(0.60f, 0.85f, 0.95f),
         _               => CellColorA,
     };
+
+
+    // ДОП.МЕТОД: рисует орла
+    private void DrawEagle(Vector2Int origin, Sprite[] sprites)
+    {
+        float cellSize = _cellSize;
+        float startX = _fieldRect.x + origin.x * cellSize;
+        float startY = _fieldRect.y + origin.y * cellSize;
+
+        // Порядок спрайтов: 0=TL, 1=TR, 2=BL, 3=BR
+        Rect[] positions = new Rect[4]
+        {
+            new Rect(startX, startY, cellSize, cellSize),
+            new Rect(startX + cellSize, startY, cellSize, cellSize),
+            new Rect(startX, startY + cellSize, cellSize, cellSize),
+            new Rect(startX + cellSize, startY + cellSize, cellSize, cellSize),
+        };
+
+        for (int i = 0; i < 4; i++)
+        {
+            if (sprites[i] != null)
+            {
+                DrawSprite(positions[i], sprites[i]);
+            }
+        }
+    }
 
 
     // ДОП.МЕТОД: все маркеры рисуем здесь, чтобы не засерать метод отрисовки канваса
@@ -790,11 +835,20 @@ public class LevelEditorWindow : EditorWindow
                              _cellSize * 2,
                              _cellSize * 2);
 
-        // 3. Рисуем маркер (прямоугольник, цвет)
-        EditorGUI.DrawRect(rect, bgColor);             
+        
+        if (label == "B" && _tileset != null && _tileset.eagleSprites != null 
+            && _tileset.eagleSprites.Length == 4)
+        {
+            DrawEagle(origin, _tileset.eagleSprites);
+        }
+        else
+        {
+            // 3. Рисуем маркер (прямоугольник, цвет)
+            EditorGUI.DrawRect(rect, bgColor);
 
-        // 4. Делаем подпись маркера (прямоугольник, подпись, стиль подписи)
-        GUI.Label(rect, label, _s_markerLabel);
+            // 4. Делаем подпись маркера (прямоугольник, подпись, стиль подписи)
+            GUI.Label(rect, label, _s_markerLabel);
+        }        
     }
 
 

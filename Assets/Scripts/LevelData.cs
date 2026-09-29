@@ -7,7 +7,7 @@ public enum TileType: byte
     Brick  = 1, 
     Steel  = 2,
     Water  = 3,
-    Forest = 4,
+    Trees  = 4,
     Ice    = 5,
 }
 
