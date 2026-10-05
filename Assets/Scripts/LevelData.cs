@@ -61,7 +61,7 @@ public class LevelData : ScriptableObject
     public IReadOnlyList<Vector2Int> EnemySpawns => _enemySpawns;
     public IReadOnlyList<Vector2Int> PlayerSpawns => _playerSpawns;
 
-    public TileType GetTile(int x, int y) => _tiles[y * FieldWidth + x];
+    public TileType GetTileType(int x, int y) => _tiles[y * FieldWidth + x];
     
     public bool InBounds(int x, int y) => 
                                           x >= 0 

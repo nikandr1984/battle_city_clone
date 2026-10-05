@@ -371,7 +371,7 @@ public class LevelEditorWindow : EditorWindow
 
             // Определяем тип тайла
             string tileType = _level != null
-                ? _level.GetTile(_cursorCell.x, _cursorCell.y).ToString()
+                ? _level.GetTileType(_cursorCell.x, _cursorCell.y).ToString()
                 : "-";
                         
             statText = $"Cell: ({_cursorCell.x}, {_cursorCell.y}) Tile: {tileType}";
@@ -509,7 +509,7 @@ public class LevelEditorWindow : EditorWindow
         {
             int x = coordMarker.x + dx, y = coordMarker.y + dy;
             if (x >= FieldWidth || y >= FieldHeight) continue;
-            if (_level.GetTile(x, y) != TileType.Empty) blocked = true;
+            if (_level.GetTileType(x, y) != TileType.Empty) blocked = true;
         }
 
         if (blocked)
@@ -713,7 +713,7 @@ public class LevelEditorWindow : EditorWindow
     private void DrawTileCell(int x, int y)
     {
         Rect rect = CoordToPixelRect(x, y);
-        TileType tileType = _level != null ? _level.GetTile(x, y) : TileType.Empty;
+        TileType tileType = _level != null ? _level.GetTileType(x, y) : TileType.Empty;
 
         // Пустые клетки всегда шахматкой - это фон, у него нет спрайта
         if (tileType == TileType.Empty)
@@ -1030,7 +1030,7 @@ public class LevelEditorWindow : EditorWindow
             Vector2Int c = new (origin.x + dx, origin.y + dy);
             
             if (!IsInBounds(c)) continue;
-            if (_level.GetTile(c.x, c.y) == brush) continue;
+            if (_level.GetTileType(c.x, c.y) == brush) continue;
 
             // Снимок undo только перед первым реальным изменением штриха
             if (!_strokeUndoRegistered)
