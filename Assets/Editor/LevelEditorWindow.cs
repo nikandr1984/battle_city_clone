@@ -242,7 +242,7 @@ public class LevelEditorWindow : EditorWindow
         GUILayout.BeginArea(paletteArea);
         {
             // 3. Делаем метку Кисти
-            GUILayout.Label("Кисти", EditorStyles.boldLabel);
+            GUILayout.Label("Brushes", EditorStyles.boldLabel);
             GUILayout.Space(1);
 
             // 4. Создаем безопасные копии стилей кистей
@@ -288,15 +288,15 @@ public class LevelEditorWindow : EditorWindow
             
             // 8. Отрисовываем кнопки маркеров
             GUILayout.Space(10);
-            GUILayout.Label("Маркеры", EditorStyles.boldLabel);
+            GUILayout.Label("Markers", EditorStyles.boldLabel);
             GUILayout.Space(1);
 
-            DrawToolButton("База (В)", ToolType.Base, MarkerBase);
-            DrawToolButton("Игрок 1",  ToolType.P1, MarkerPlayer);
-            DrawToolButton("Игрок 2",  ToolType.P2, MarkerPlayer);
-            DrawToolButton("Враг 1",   ToolType.E1, MarkerEnemy);
-            DrawToolButton("Враг 2",   ToolType.E2, MarkerEnemy);
-            DrawToolButton("Враг 3",   ToolType.E3, MarkerEnemy);
+            DrawToolButton("Base (В)", ToolType.Base, MarkerBase);
+            DrawToolButton("Player 1",  ToolType.P1, MarkerPlayer);
+            DrawToolButton("Player 2",  ToolType.P2, MarkerPlayer);
+            DrawToolButton("Enemy 1",   ToolType.E1, MarkerEnemy);
+            DrawToolButton("Enemy 2",   ToolType.E2, MarkerEnemy);
+            DrawToolButton("Enemy 3",   ToolType.E3, MarkerEnemy);
         }
 
         GUILayout.EndArea();
@@ -440,7 +440,7 @@ public class LevelEditorWindow : EditorWindow
         EnsureValidationStyles();
         GUILayout.BeginArea(_validationRect);
         {
-            GUILayout.Label("Валидация", _s_valTitle);
+            GUILayout.Label("Validation", _s_valTitle);
             GUILayout.Space(4);
 
             List<ValidationIssue> issues = CollectIssues();

@@ -465,7 +465,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: lives_ui
+      name: lives
       rect:
         serializedVersion: 2
         x: 46
@@ -597,7 +597,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: gray_tile
+      name: ui_frame
       rect:
         serializedVersion: 2
         x: 46
@@ -1178,9 +1178,8 @@ TextureImporter:
       flag_br: 6448076281042918251
       flag_tl: -3191042002114958795
       flag_tr: -8219329081260532338
-      gray_tile: 1869454690677446185
       ice: -8106014855011599515
-      lives_ui: -4794194405260003387
+      lives: -4794194405260003387
       num_0: -3187488539777282145
       num_1: 7119663151250040027
       num_2: -6161192688517827409
@@ -1202,6 +1201,7 @@ TextureImporter:
       sprites_atlas_1_41: -7682334368951922773
       steel: -1062848816298764035
       trees: -821167355240183018
+      ui_frame: 1869454690677446185
       water_1: 519535645060365707
       water_2: -5464885230410399553
   mipmapLimitGroupName: 

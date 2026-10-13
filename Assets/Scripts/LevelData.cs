@@ -99,8 +99,4 @@ public class LevelData : ScriptableObject
     // Сеттер тайлов
     public void SetTile(int x, int y, TileType value) => _tiles[y * FieldWidth + x] = value;
 
-
-
-
-
 }

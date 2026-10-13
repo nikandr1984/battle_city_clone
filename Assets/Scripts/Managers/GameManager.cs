@@ -4,6 +4,7 @@ public class GameManager : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private LevelManager _levelManager;
+    [SerializeField] private UIManager _uiManager;
 
     [Header("Level Data")]
     [Tooltip("The level that will be loaded when the stage starts")]
@@ -33,6 +34,16 @@ public class GameManager : MonoBehaviour
         Debug.Log($"GameManager: Запуск уровня {levelData.LevelNumber}");
 
         _levelManager.LoadLevel(levelData);
+
+        _uiManager.InitializeHUD(levelNumber: levelData.LevelNumber,
+                                   totalEnemies: 20, // TODO: получить из LevelData
+                                   lives1P: 3,
+                                   lives2P: 3,
+                                   twoPlayers: false);
+
+
+
+
     }
 
 

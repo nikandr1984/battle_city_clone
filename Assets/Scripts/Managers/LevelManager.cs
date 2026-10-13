@@ -23,6 +23,11 @@ public class LevelManager : MonoBehaviour
     private LevelState _currentState;     // Текущее состояние уровня в памяти
 
 
+    // Константы смещения, учитывающие размер UI-рамки
+    private const int FieldOffsetX = 2;  // 2 клетки рамки слева
+    private const int FieldPffsetY = 1;  // 1 клетка рамки сверху
+
+
     // МЕТОД: загружает уровень
     public void LoadLevel(LevelData levelData)
     {
@@ -130,8 +135,8 @@ public class LevelManager : MonoBehaviour
                 }
 
                 // Конвертируем координаты: LevelData (Y вниз) -> Unity (Y вверх)
-                int cellX = dataX;                
-                int cellY = height - 1 - dataY;
+                int cellX = dataX + FieldOffsetX;                
+                int cellY = (height - 1 - dataY) + FieldPffsetY;
                 Vector3Int cellPosition = new Vector3Int(cellX, cellY, 0);
 
                 // Устанавливаем тайл
@@ -167,12 +172,14 @@ public class LevelManager : MonoBehaviour
         }        
     }
 
+
     // ХЕЛПЕР: обновляет визуал тайла при изменении состояния
     private void UpdateTileVisual(int x, int y, TileType newType)
     {
         // Конвертируем коордмнаты (Y вниз -> Y вверх)
-        int cellY = LevelData.FieldHeight - 1 - y;
-        Vector3Int cellPosition = new Vector3Int(x, cellY, 0);
+        int cellX = x + FieldOffsetX;
+        int cellY = (LevelData.FieldHeight - 1 - y) + FieldPffsetY;
+        Vector3Int cellPosition = new Vector3Int(cellX, cellY, 0);
 
         // Очищаем все тайлмапы в этой клетке
         _tilemapWalls?.SetTile(cellPosition, null);
@@ -208,8 +215,8 @@ public class LevelManager : MonoBehaviour
         Vector2Int basePosEditor = levelData.BasePosition;
 
         // Конвертируем координаты: LevelData (Y вниз) -> Unity (Y вверх)
-        int cellX = basePosEditor.x;
-        int cellY = LevelData.FieldHeight - 2 - basePosEditor.y;        
+        int cellX = basePosEditor.x + FieldOffsetX;
+        int cellY = (LevelData.FieldHeight - 2 - basePosEditor.y) + FieldPffsetY;        
         
         // Переводим координаты в трехмерную систему
         Vector3Int basePosUnity = new Vector3Int(cellX, cellY, 0);
@@ -227,6 +234,7 @@ public class LevelManager : MonoBehaviour
 
         Debug.Log($"LevelLoader: Eagle spawned at {basePosWorld} (cell {basePosEditor}).");
     }
+
 
     // МЕТОД: спавнит маркеры
     private void SpawnMarkers(LevelData levelData)
@@ -266,8 +274,8 @@ public class LevelManager : MonoBehaviour
                                    Sprite sprite, Color color)
     {
         // Конвертируем координаты: LevelData (Y вниз) -> Unity (Y вверх)
-        int cellX = dataPos.x;
-        int cellY = LevelData.FieldHeight - 2 - dataPos.y;
+        int cellX = dataPos.x + FieldOffsetX;
+        int cellY = (LevelData.FieldHeight - 2 - dataPos.y) + FieldPffsetY;
 
         // Переводим координаты в трехмерную систему
         Vector3Int cellPosition = new Vector3Int(cellX, cellY, 0);
@@ -288,12 +296,6 @@ public class LevelManager : MonoBehaviour
         sr.color = color;
         sr.sortingLayerName = "UI";
         sr.sortingOrder = 10;
-    }
-
-
-
-
-
-    
+    }   
 
 }
